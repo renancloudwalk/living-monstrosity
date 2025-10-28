@@ -23,7 +23,7 @@ I want a reliable way to teach open-source LLMs (likely Qwen-based) to call real
 3. **Scale out on Prime Intellect**
    - `prime pods create ...` to spin up the GPU cluster you need.
    - `./scripts/bootstrap_prime_env.sh` on the pod to sync dependencies.
-   - `uv run trainer @ configs/prime/rl/train.toml` to launch GRPO at scale. The full pod workflow lives in `docs/prime-playbook.md`.
+   - `./scripts/run_prime_training.sh configs/prime/rl/train.toml` to kick off GRPO at scale. The full pod workflow lives in `docs/prime-playbook.md`.
    - Track metrics through Weights & Biases (or the Prime dashboards) and checkpoint frequently.
 
 ## Repository structure

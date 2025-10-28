@@ -26,9 +26,9 @@ The bootstrap script installs `uv`, syncs dependencies (including PyTorch ≥2.8
 
 ## 4. Run the training job
 ```bash
-uv run trainer @ configs/prime/rl/train.toml
+./scripts/run_prime_training.sh configs/prime/rl/train.toml
 ```
-Tune `UV_EXTRA_INDEX_URL` if you need to point at a different CUDA wheel index (e.g., `cu121`). To stream logs to Weights & Biases, ensure `wandb_enabled = true` and run `uv run wandb login` first.
+The wrapper ensures the virtualenv is active, sets the CUDA wheel index (`UV_EXTRA_INDEX_URL` defaults to `cu124`), and reuses `WANDB_API_KEY` if present. Append extra trainer flags after the config path (e.g., `--trainer.total_epochs=5`).
 
 ## 5. Monitor & iterate
 - Check `artifacts/vf-function-caller-prime/` for checkpoints, logs, and metrics dumps.

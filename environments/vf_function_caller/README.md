@@ -32,3 +32,4 @@ The dataset lives inside `vf_function_caller.py` for now. Add richer tasks by ex
 - Keep tool docstrings precise—the model reads them to decide when to call the tool.
 - Adjust the rubric weights in `load_environment` to encourage or discourage tool usage.
 - Use `vf.ToolEnv(max_turns=6, ...)` to guard against runaway conversations.
+- For Prime runs, push changes and let pods pull from GitHub, then execute `./scripts/bootstrap_prime_env.sh` followed by `./scripts/run_prime_training.sh configs/prime/rl/train.toml`.

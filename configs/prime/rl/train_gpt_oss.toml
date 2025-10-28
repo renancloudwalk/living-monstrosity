@@ -1,0 +1,56 @@
+# GRPO configuration targeting openai/gpt-oss-20b.
+# Assumes access to at least 16 A100/H100 GPUs with vLLM for rollouts.
+
+[run]
+experiment_name = "vf-function-caller-gpt-oss"
+project_name = "vf-function-caller"
+output_dir = "artifacts/vf-function-caller-gpt-oss"
+
+[policy]
+model_id = "openai/gpt-oss-20b"
+max_seq_len = 4096
+
+[reference]
+model_id = "openai/gpt-oss-20b"
+
+[environment]
+module = "vf-function-caller"
+max_turns = 6
+
+[trainer]
+algorithm = "grpo"
+total_epochs = 1
+rollout_batch_size = 512
+update_batch_size = 512
+kl_target = 0.05
+kl_coefficient = 0.0003
+checkpoint_interval_steps = 25
+evaluation_interval_steps = 25
+
+[logging]
+wandb_enabled = true
+wandb_project = "vf-function-caller"
+wandb_run_name = "gpt-oss-20b"
+
+[launcher]
+launcher_type = "torchrun"
+num_nodes = 2
+gpus_per_node = 8
+nnodes = 2
+nproc_per_node = 8
+
+[rollout]
+inference_engine = "vllm"
+tensor_parallel_size = 8
+gpu_memory_utilization = 0.85
+max_concurrency = 128
+timeout_seconds = 180
+
+[optimizer]
+lr = 1.0e-6
+weight_decay = 0.0
+
+[kl_control]
+type = "adaptive"
+target = 0.05
+coefficient = 0.0003

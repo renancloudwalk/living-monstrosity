@@ -3,7 +3,9 @@
 ## 1. Prep locally
 - Install the Prime CLI once: `uv tool install prime` then `prime login`.
 - Push the latest repository state to GitHub (Prime pods will pull from there).
-- Note the config you intend to run (`configs/prime/rl/train.toml`). It defaults to a single 4-GPU node and Qwen2.5-3B; bump model size or batch counts after the baseline succeeds.
+- Pick a config:
+  - `configs/prime/rl/train.toml` — 4×GPU baseline with Qwen2.5-3B.
+  - `configs/prime/rl/train_gpt_oss.toml` — 16×GPU recipe for `openai/gpt-oss-20b` (requires vLLM tensor parallelism).
 
 ## 2. Provision a pod
 ```bash
@@ -27,6 +29,8 @@ The bootstrap script installs `uv`, syncs dependencies (including PyTorch ≥2.8
 ## 4. Run the training job
 ```bash
 ./scripts/run_prime_training.sh configs/prime/rl/train.toml
+# or for GPT-OSS
+./scripts/run_prime_training.sh configs/prime/rl/train_gpt_oss.toml
 ```
 The wrapper ensures the virtualenv is active, sets the CUDA wheel index (`UV_EXTRA_INDEX_URL` defaults to `cu124`), and reuses `WANDB_API_KEY` if present. Append extra trainer flags after the config path (e.g., `--trainer.total_epochs=5`).
 

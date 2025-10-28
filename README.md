@@ -24,6 +24,7 @@ I want a reliable way to teach open-source LLMs (likely Qwen-based) to call real
    - `prime pods create ...` to spin up the GPU cluster you need.
    - `./scripts/bootstrap_prime_env.sh` on the pod to sync dependencies.
    - `./scripts/run_prime_training.sh configs/prime/rl/train.toml` to kick off GRPO at scale. The full pod workflow lives in `docs/prime-playbook.md`.
+   - To go “full GPT-OSS,” switch to `configs/prime/rl/train_gpt_oss.toml` (defaults to `openai/gpt-oss-20b` and a 2×8 GPU pod).
    - Track metrics through Weights & Biases (or the Prime dashboards) and checkpoint frequently.
 
 ## Repository structure
@@ -45,4 +46,5 @@ Everything new should live inside that layout—no stray files at repo root.
 ## Next notes for myself
 - Add coverage for negative/errored HTTP cases to the dataset to stress tool robustness.
 - Tune the Prime config in `configs/prime/rl/train.toml` based on first cluster runs (start with the 4×GPU baseline).
+- Stress-test the GPT-OSS config (`configs/prime/rl/train_gpt_oss.toml`) and record the required pod specs.
 - Keep `docs/prime-playbook.md` updated as the deployment process evolves.

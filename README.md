@@ -16,13 +16,14 @@ I want a reliable way to teach open-source LLMs (likely Qwen-based) to call real
    - Keep the dataset in `data/examples.jsonl` in sync with the curriculum you care about.
 
 2. **Prototype locally**
-   - Install Verifiers + Prime-RL with `uv`.
+   - Install Verifiers + Prime-RL with `uv` (CPU-only evals are fine even if training is not).
    - Run `./scripts/run_local_eval.sh gpt-4.1-mini` (or any OpenAI-compatible model) to sanity-check tool usage.
    - Iterate on prompts, parser, and rewards until success rate is measurable.
 
-3. **Scale out**
-   - Containerize the working setup.
-   - Launch Prime pods with the same environment package and dial up node/GPU counts using Prime-RL’s multi-node flags.
+3. **Scale out on Prime Intellect**
+   - `prime pods create ...` to spin up the GPU cluster you need.
+   - `./scripts/bootstrap_prime_env.sh` on the pod to sync dependencies.
+   - `uv run trainer @ configs/prime/rl/train.toml` to launch GRPO at scale. The full pod workflow lives in `docs/prime-playbook.md`.
    - Track metrics through Weights & Biases (or the Prime dashboards) and checkpoint frequently.
 
 ## Repository structure
@@ -43,5 +44,5 @@ Everything new should live inside that layout—no stray files at repo root.
 
 ## Next notes for myself
 - Expand the dataset beyond the three starter examples.
-- Wire `configs/debug/rl/train.toml` into a working Prime-RL launch script.
-- Document the exact Prime pod recipes once the first successful run lands.
+- Tune the Prime config in `configs/prime/rl/train.toml` based on first cluster runs.
+- Keep `docs/prime-playbook.md` updated as the deployment process evolves.

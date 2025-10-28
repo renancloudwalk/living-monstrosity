@@ -1,0 +1,46 @@
+# Prime-scale GRPO config targeting vf-function-caller.
+# Tailor batch sizes and launcher fields to your cluster before running.
+
+[run]
+experiment_name = "vf-function-caller-prime"
+project_name = "vf-function-caller"
+output_dir = "artifacts/vf-function-caller-prime"
+
+[policy]
+model_id = "Qwen/Qwen2.5-7B-Instruct"
+max_seq_len = 4096
+
+[reference]
+model_id = "Qwen/Qwen2.5-7B-Instruct"
+
+[environment]
+module = "vf-function-caller"
+max_turns = 6
+
+[trainer]
+algorithm = "grpo"
+total_epochs = 3
+rollout_batch_size = 512
+update_batch_size = 512
+kl_target = 0.08
+kl_coefficient = 0.001
+checkpoint_interval_steps = 100
+evaluation_interval_steps = 100
+
+[logging]
+wandb_enabled = true
+wandb_project = "vf-function-caller"
+wandb_run_name = "prime-run"
+
+[launcher]
+num_nodes = 2
+gpus_per_node = 8
+launcher_type = "torchrun"
+nnodes = 2
+nproc_per_node = 8
+
+[rollout]
+inference_engine = "vllm"
+gpu_memory_utilization = 0.9
+max_concurrency = 256
+timeout_seconds = 120

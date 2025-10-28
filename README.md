@@ -11,13 +11,13 @@ I want a reliable way to teach open-source LLMs (likely Qwen-based) to call real
 
 ## Immediate plan of attack
 1. **Bootstrap the environment package**
-   - Use `prime env init vf-function-caller` (or `vf-init`) to scaffold a Verifiers environment.
-   - Implement `ToolEnv` with a `curl`-like Python function (restrict domains, redact headers, sanitize inputs).
-   - Add a rubric that rewards correct final answers and penalizes useless tool spam.
+   - Install the package locally with `uv pip install -e environments/vf_function_caller`.
+   - `ToolEnv` already exposes a constrained `http_fetch` tool; extend its allowlist or rubric as new tasks demand.
+   - Keep the dataset in `data/examples.jsonl` in sync with the curriculum you care about.
 
 2. **Prototype locally**
    - Install Verifiers + Prime-RL with `uv`.
-   - Run the debug RL config against a small Qwen checkpoint (`configs/debug/rl/train.toml`) until the tool loop behaves.
+   - Run `./scripts/run_local_eval.sh gpt-4.1-mini` (or any OpenAI-compatible model) to sanity-check tool usage.
    - Iterate on prompts, parser, and rewards until success rate is measurable.
 
 3. **Scale out**
@@ -25,15 +25,16 @@ I want a reliable way to teach open-source LLMs (likely Qwen-based) to call real
    - Launch Prime pods with the same environment package and dial up node/GPU counts using Prime-RL’s multi-node flags.
    - Track metrics through Weights & Biases (or the Prime dashboards) and checkpoint frequently.
 
-## Repository structure (incoming)
+## Repository structure
 ```
 .
-├── environments/          # Verifiers packages live here (to be added)
-├── configs/               # Prime-RL training/eval configs
-├── scripts/               # Helper scripts (setup, rollout, analysis)
-└── README.md              # You are here
+├── AGENTS.md
+├── README.md
+├── configs/               # Prime-RL training/eval configs and notes
+├── environments/          # Verifiers packages (vf-function-caller)
+└── scripts/               # Helper scripts (vf-eval wrappers, etc.)
 ```
-Nothing besides this README is checked in yet—every new piece of work should show up under the layout above.
+Everything new should live inside that layout—no stray files at repo root.
 
 ## Contributing (a.k.a. future me, pay attention)
 1. Create or update files.
@@ -41,7 +42,6 @@ Nothing besides this README is checked in yet—every new piece of work should s
 3. `git add`, commit with a descriptive message, and push. I promised myself “always commit and push things,” so no local-only hacks.
 
 ## Next notes for myself
-- Write the actual tool wrapper with tight security controls.
-- Decide on dataset format (Parquet vs. on-the-fly generation) and hook it into Prime-RL.
+- Expand the dataset beyond the three starter examples.
+- Wire `configs/debug/rl/train.toml` into a working Prime-RL launch script.
 - Document the exact Prime pod recipes once the first successful run lands.
-

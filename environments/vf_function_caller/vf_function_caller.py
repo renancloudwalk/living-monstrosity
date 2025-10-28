@@ -85,6 +85,21 @@ DEFAULT_DATASET = [
         "answer": "Prime Intellect - Commoditizing Compute & Intelligence",
         "metadata": {"require_tool": True},
     },
+    {
+        "prompt": (
+            "Fetch https://httpbin.org/json with the curl tool and return the value "
+            "of slideshow.title."
+        ),
+        "answer": "Sample Slide Show",
+        "metadata": {"require_tool": True},
+    },
+    {
+        "prompt": (
+            "Respond with the number 42. Do not call the curl tool for this task."
+        ),
+        "answer": "42",
+        "metadata": {"require_tool": False},
+    },
 ]
 
 SYSTEM_PROMPT = (

@@ -43,6 +43,6 @@ Everything new should live inside that layout—no stray files at repo root.
 3. `git add`, commit with a descriptive message, and push. I promised myself “always commit and push things,” so no local-only hacks.
 
 ## Next notes for myself
-- Expand the dataset beyond the three starter examples.
-- Tune the Prime config in `configs/prime/rl/train.toml` based on first cluster runs.
+- Add coverage for negative/errored HTTP cases to the dataset to stress tool robustness.
+- Tune the Prime config in `configs/prime/rl/train.toml` based on first cluster runs (start with the 4×GPU baseline).
 - Keep `docs/prime-playbook.md` updated as the deployment process evolves.

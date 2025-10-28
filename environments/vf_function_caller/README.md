@@ -29,6 +29,7 @@ The dataset lives inside `vf_function_caller.py` for now. Add richer tasks by ex
 
 ## Development tips
 
+- The dataset mixes tool-required prompts (fetching titles, JSON fields) and a single no-tool prompt (return `42`) to encourage thoughtful tool usage.
 - Keep tool docstrings precise—the model reads them to decide when to call the tool.
 - Adjust the rubric weights in `load_environment` to encourage or discourage tool usage.
 - Use `vf.ToolEnv(max_turns=6, ...)` to guard against runaway conversations.

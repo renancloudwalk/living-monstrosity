@@ -3,7 +3,7 @@
 ## 1. Prep locally
 - Install the Prime CLI once: `uv tool install prime` then `prime login`.
 - Push the latest repository state to GitHub (Prime pods will pull from there).
-- Note the config you intend to run (`configs/prime/rl/train.toml`) and update it with your model IDs, batch sizes, and launcher parameters.
+- Note the config you intend to run (`configs/prime/rl/train.toml`). It defaults to a single 4-GPU node and Qwen2.5-3B; bump model size or batch counts after the baseline succeeds.
 
 ## 2. Provision a pod
 ```bash
@@ -35,7 +35,12 @@ The wrapper ensures the virtualenv is active, sets the CUDA wheel index (`UV_EXT
 - Use `prime pods logs <name>` from your local machine for real-time streaming.
 - Adjust `rollout_batch_size`, `kl_coefficient`, or dataset contents between runs; commit changes so pods can pull them.
 
-## 6. Tear down
+## 6. Post-run verification
+- Load a checkpoint locally: `uv run vf-eval vf-function-caller -m path/to/checkpoint --show-tool-calls`.
+- Inspect W&B curves (reward, KL, tool usage) to ensure the policy is learning rather than collapsing.
+- Spot-check raw rollouts in `artifacts/.../rollouts/` to confirm the model respects the no-tool prompt (`42`).
+
+## 7. Tear down
 When finished, shut down resources to avoid extra cost:
 ```bash
 prime pods delete vf-function-caller-dev

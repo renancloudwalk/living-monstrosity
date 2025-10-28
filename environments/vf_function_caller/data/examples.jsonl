@@ -1,3 +1,5 @@
 {"prompt": "Use the provided curl tool to fetch https://example.com. Return only the page title.", "answer": "Example Domain", "metadata": {"require_tool": true}}
 {"prompt": "Call the curl tool on https://httpbin.org/get and report the value of the url field from the JSON response.", "answer": "https://httpbin.org/get", "metadata": {"require_tool": true}}
 {"prompt": "Query https://www.primeintellect.ai/ with the curl tool. Reply with the main headline found on the page.", "answer": "Prime Intellect - Commoditizing Compute & Intelligence", "metadata": {"require_tool": true}}
+{"prompt": "Fetch https://httpbin.org/json with the curl tool and return the value of slideshow.title.", "answer": "Sample Slide Show", "metadata": {"require_tool": true}}
+{"prompt": "Respond with the number 42. Do not call the curl tool for this task.", "answer": "42", "metadata": {"require_tool": false}}

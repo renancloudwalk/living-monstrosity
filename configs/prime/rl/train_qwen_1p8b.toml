@@ -1,0 +1,45 @@
+# Lightweight GRPO config for Qwen2.5-1.8B on a 2×GPU pod.
+
+[run]
+experiment_name = "vf-function-caller-qwen1.8b"
+project_name = "vf-function-caller"
+output_dir = "artifacts/vf-function-caller-qwen1p8b"
+
+[policy]
+model_id = "Qwen/Qwen2.5-1.8B"
+max_seq_len = 2048
+
+[reference]
+model_id = "Qwen/Qwen2.5-1.8B"
+
+[environment]
+module = "vf-function-caller"
+max_turns = 6
+
+[trainer]
+algorithm = "grpo"
+total_epochs = 2
+rollout_batch_size = 128
+update_batch_size = 128
+kl_target = 0.05
+kl_coefficient = 0.0005
+checkpoint_interval_steps = 50
+evaluation_interval_steps = 50
+
+[logging]
+wandb_enabled = true
+wandb_project = "vf-function-caller"
+wandb_run_name = "qwen1p8b-poc"
+
+[launcher]
+launcher_type = "torchrun"
+num_nodes = 1
+gpus_per_node = 2
+nnodes = 1
+nproc_per_node = 2
+
+[rollout]
+inference_engine = "vllm"
+gpu_memory_utilization = 0.9
+max_concurrency = 128
+timeout_seconds = 120

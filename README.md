@@ -24,7 +24,8 @@ I want a reliable way to teach open-source LLMs (likely Qwen-based) to call real
    - `prime pods create ...` to spin up the GPU cluster you need.
    - `./scripts/bootstrap_prime_env.sh` on the pod to sync dependencies.
    - `./scripts/run_prime_training.sh configs/prime/rl/train.toml` to kick off GRPO at scale. The full pod workflow lives in `docs/prime-playbook.md`.
-   - To go “full GPT-OSS,” switch to `configs/prime/rl/train_gpt_oss.toml` (defaults to `openai/gpt-oss-20b` and a 2×8 GPU pod).
+   - POC mode? Use `configs/prime/rl/train_qwen_1p8b.toml` (2×GPU Qwen2.5-1.8B).
+   - Going bigger? `configs/prime/rl/train_gpt_oss.toml` targets `openai/gpt-oss-20b` with 16 GPUs.
    - Track metrics through Weights & Biases (or the Prime dashboards) and checkpoint frequently.
 
 ## Repository structure

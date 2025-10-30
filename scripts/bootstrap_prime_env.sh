@@ -16,15 +16,21 @@ STUB_WHEEL_DIR="$REPO_ROOT/vendor/cuda_stubs"
 if command -v apt-get >/dev/null 2>&1; then
   echo "[bootstrap] Ensuring CUDA runtime libraries via apt (best effort)..." >&2
   set +e
+  if ! dpkg -s cuda-keyring >/dev/null 2>&1; then
+    echo "[bootstrap] Installing NVIDIA cuda-keyring..." >&2
+    TEMP_KEYRING="$(mktemp -t cuda-keyring-XXXX.deb)"
+    curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/cuda-keyring_1.1-1_all.deb -o "$TEMP_KEYRING" \
+      && dpkg -i "$TEMP_KEYRING" >/dev/null 2>&1
+    rm -f "$TEMP_KEYRING"
+  fi
   apt-get update >/dev/null 2>&1
-  apt-get install -y --no-install-recommends \
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     cuda-runtime-12-8 \
     cuda-toolkit-12-8 \
     cuda-nvrtc-12-8 \
     cuda-nvtx-12-8 \
     cuda-nvjitlink-12-8 \
     cuda-cupti-12-8 \
-    cuda-nvprof-12-8 \
     cuda-nvshmem-12-8 \
     libcublas-12-8 \
     libcufft-12-8 \
@@ -33,6 +39,8 @@ if command -v apt-get >/dev/null 2>&1; then
     libcusparse-12-8 \
     libcufile-12-8 \
     libnccl2 \
+    libcudnn9 \
+    libcudnn9-cuda-12 \
     >/dev/null 2>&1
   APT_STATUS=$?
   set -e

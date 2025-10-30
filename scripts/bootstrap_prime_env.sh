@@ -13,7 +13,7 @@ fi
 REPO_ROOT="$(pwd)"
 STUB_WHEEL_DIR="$REPO_ROOT/vendor/cuda_stubs"
 
-if command -v apt-get >/dev/null 2>&1; then
+if command -v apt-get >/dev/null 2>&1 && [[ "$(id -u)" -eq 0 ]]; then
   echo "[bootstrap] Ensuring CUDA runtime libraries via apt (best effort)..." >&2
   set +e
   if ! dpkg -s cuda-keyring >/dev/null 2>&1; then

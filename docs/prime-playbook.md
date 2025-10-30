@@ -2,6 +2,11 @@
 
 ## 1. Prep locally
 - Install the Prime CLI once: `uv tool install prime` then `prime login`.
+- Point the CLI at your SSH key so `prime pods ssh` works:
+  ```bash
+  prime config set-ssh-key-path /path/to/your/private/key
+  prime config view  # optional sanity check
+  ```
 - Push the latest repository state to GitHub (Prime pods will pull from there).
 - Pick a config:
   - `configs/prime/rl/train_qwen_1p8b.toml` — 2×GPU proof-of-concept with Qwen2.5-1.8B.
@@ -19,13 +24,20 @@ prime pods ssh vf-function-caller-dev
 Pick the machine type and image that matches your needs (e.g., `gpux8-h100`, custom Docker image, etc.). Add `--team <slug>` if you’re using a shared account.
 
 ## 3. Bootstrap dependencies inside the pod
+Fastest path:
+```bash
+curl -fsSL https://raw.githubusercontent.com/renancloudwalk/living-monstrosity/main/scripts/prime_autorun.sh | bash
+```
+This clones the repo, installs dependencies, launches inference, generates rollouts, and trains a debug GRPO run automatically. Customize repo/branch/port/output paths by exporting `LM_REPO`, `LM_BRANCH`, `LM_PORT`, or `LM_OUTPUT` ahead of time.
+
+Prefer a manual setup? Do the classic steps instead:
 ```bash
 git clone git@github.com:renancloudwalk/living-monstrosity.git
 cd living-monstrosity
 ./scripts/bootstrap_prime_env.sh
 source .venv/bin/activate
 ```
-The bootstrap script installs `uv`, syncs dependencies (including PyTorch ≥2.8), and attaches the `vf-function-caller` package in editable mode.
+The bootstrap script installs `uv`, syncs dependencies, and attaches the `vf-function-caller` package in editable mode.
 
 ## 4. Run the training job
 ```bash
@@ -47,9 +59,16 @@ The wrapper ensures the virtualenv is active, sets the CUDA wheel index (`UV_EXT
 - Inspect W&B curves (reward, KL, tool usage) to ensure the policy is learning rather than collapsing.
 - Spot-check raw rollouts in `artifacts/.../rollouts/` to confirm the model respects the no-tool prompt (`42`).
 
-## 7. Tear down
-When finished, shut down resources to avoid extra cost:
+## 7. Shut down or restart
+
+### Restart without reprovisioning
+- `prime pods ssh vf-function-caller-dev` to hop back into the existing pod.
+- Restart services (e.g., relaunch `make serve-qwen`, `make orchestrate`, etc.) or `sudo reboot` if you need a clean OS restart.
+- Reuse the pod while iterating; only terminate and recreate once you’ve backed up artifacts.
+
+### Terminate when you’re done
+When you’re ready to release the hardware, remember that termination wipes the pod’s disk. Back up checkpoints, rollouts, and logs to durable storage (Prime artifacts, S3, Git LFS, etc.) before you pull the plug.
 ```bash
-prime pods delete vf-function-caller-dev
+prime pods terminate vf-function-caller-dev
 ```
 Capture key metrics and link the run in issues/PRs so future iterations have a history trail.

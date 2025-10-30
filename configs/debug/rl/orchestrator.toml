@@ -1,0 +1,33 @@
+# Debug orchestrator config for vf-function-caller rollouts.
+
+[run]
+output_dir = "outputs/manual-run"
+max_steps = 50
+async_level = 2
+batch_size = 16
+rollouts_per_example = 1
+
+[model]
+name = "Qwen/Qwen2.5-0.5B"
+trust_remote_code = true
+
+[client]
+base_url = "http://127.0.0.1:8000/v1"
+timeout = 30.0
+
+[environment]
+id = "vf-function-caller"
+args = {}
+
+[sampling]
+temperature = 0.8
+repetition_penalty = 1.05
+top_p = 0.95
+max_tokens = 256
+min_tokens = 1
+seed = 0
+
+[logging]
+log_interval = 10
+save_conversations = true
+save_dir = "rollouts"

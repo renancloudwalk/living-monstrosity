@@ -1,0 +1,69 @@
+name: GPU Tests
+
+on:
+  push:
+    branches: [main, refactor]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  setup:
+    name: Setup environment
+    runs-on: self-hosted
+    timeout-minutes: 30
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Install dependencies
+        run: uv sync --locked && uv sync --all-extras --locked
+
+  unit-tests:
+    name: Unit tests
+    runs-on: self-hosted
+    timeout-minutes: 15
+    needs: setup
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    steps:
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Run unit tests
+        run: PYTEST_OUTPUT_DIR=/tmp/outputs uv run pytest tests/unit -m gpu
+      - name: Cleanup output_dir
+        run: rm -rf /tmp/outputs
+
+  integration-tests:
+    name: Integration tests
+    runs-on: self-hosted
+    timeout-minutes: 15
+    needs: setup
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    steps:
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Run integration tests
+        env:
+          USERNAME_CI: CI_RUNNER
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          # Set WANDB_MODE to online only if WANDB_API_KEY is available, otherwise set to offline
+          # This is to allow running tests on forks without WANDB_API_KEY
+          WANDB_MODE: ${{ secrets.WANDB_API_KEY && 'online' || 'offline' }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          PRIME_API_KEY: ${{ secrets.PRIME_API_KEY }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          PYTEST_OUTPUT_DIR: /tmp/outputs
+        run: uv run pytest tests/integration -m gpu
+      - name: Cleanup output_dir
+        run: rm -rf /tmp/outputs

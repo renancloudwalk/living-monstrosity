@@ -1,26 +1,39 @@
-# Template Prime-RL config for vf-function-caller debugging.
-# Adjust paths, model ids, and optimizer settings before running at scale.
+# Debug trainer config for vf-function-caller with Qwen2.5-0.5B.
 
 [run]
+output_dir = "outputs/manual-run"
 experiment_name = "vf-function-caller-debug"
-project_name = "vf-function-caller"
 
-[policy]
-model_id = "Qwen/Qwen2.5-3B-Instruct"
+[model]
+name = "Qwen/Qwen2.5-0.5B"
+impl = "hf"
+attn = "sdpa"
+trust_remote_code = true
 max_seq_len = 2048
 
-[reference]
-model_id = "Qwen/Qwen2.5-3B-Instruct"
-
-[environment]
-module = "vf-function-caller"
-max_turns = 6
+[data]
+rollouts_path = "outputs/manual-run/rollouts"
+shuffle = true
+seed = 0
 
 [trainer]
 algorithm = "grpo"
-total_epochs = 1
-rollout_batch_size = 32
-update_batch_size = 32
+max_steps = 50
+async_level = 2
+rollout_batch_size = 16
+update_batch_size = 16
+kl_target = 0.5
+kl_coefficient = 0.05
+
+[optim]
+type = "adamw"
+lr = 5e-5
+weight_decay = 0.01
+betas1 = 0.9
+betas2 = 0.95
 
 [logging]
 wandb_enabled = false
+log_interval = 1
+eval_interval = 25
+save_interval = 25

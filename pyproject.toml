@@ -2,7 +2,7 @@
 name = "living-monstrosity"
 version = "0.0.1"
 description = "Local tooling for tool-calling RL experiments."
-requires-python = ">=3.10"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "verifiers>=0.1.0",
     "httpx>=0.27.0",

@@ -10,8 +10,12 @@ if ! command -v uv >/dev/null 2>&1; then
   source "$HOME/.local/bin/env"
 fi
 
+EXTRA_INDEX="${UV_EXTRA_INDEX_URL:-https://download.pytorch.org/whl/cu124}"
+INDEX_STRATEGY="${UV_INDEX_STRATEGY:-unsafe-best-match}"
+
 echo "[bootstrap] Syncing project dependencies..."
-UV_EXTRA_INDEX_URL=${UV_EXTRA_INDEX_URL:-https://download.pytorch.org/whl/cu124} \
+UV_EXTRA_INDEX_URL="$EXTRA_INDEX" \
+UV_INDEX_STRATEGY="$INDEX_STRATEGY" \
   uv sync --all-extras
 
 echo "[bootstrap] Installing vf-function-caller environment (editable)..."

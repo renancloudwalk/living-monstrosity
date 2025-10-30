@@ -1,9 +1,0 @@
-README.md
-pyproject.toml
-environments/vf_function_caller/__init__.py
-environments/vf_function_caller/vf_function_caller.py
-living_monstrosity.egg-info/PKG-INFO
-living_monstrosity.egg-info/SOURCES.txt
-living_monstrosity.egg-info/dependency_links.txt
-living_monstrosity.egg-info/requires.txt
-living_monstrosity.egg-info/top_level.txt

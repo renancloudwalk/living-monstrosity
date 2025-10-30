@@ -1,2 +1,0 @@
-[verifiers.environments]
-vf-function-caller = vf_function_caller:load_environment

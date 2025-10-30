@@ -10,6 +10,37 @@ if ! command -v uv >/dev/null 2>&1; then
   source "$HOME/.local/bin/env"
 fi
 
+REPO_ROOT="$(pwd)"
+STUB_WHEEL_DIR="$REPO_ROOT/vendor/cuda_stubs"
+
+if command -v apt-get >/dev/null 2>&1; then
+  echo "[bootstrap] Ensuring CUDA runtime libraries via apt (best effort)..." >&2
+  set +e
+  apt-get update >/dev/null 2>&1
+  apt-get install -y --no-install-recommends \
+    cuda-runtime-12-8 \
+    cuda-toolkit-12-8 \
+    cuda-nvrtc-12-8 \
+    cuda-nvtx-12-8 \
+    cuda-nvjitlink-12-8 \
+    cuda-cupti-12-8 \
+    cuda-nvprof-12-8 \
+    cuda-nvshmem-12-8 \
+    libcublas-12-8 \
+    libcufft-12-8 \
+    libcurand-12-8 \
+    libcusolver-12-8 \
+    libcusparse-12-8 \
+    libcufile-12-8 \
+    libnccl2 \
+    >/dev/null 2>&1
+  APT_STATUS=$?
+  set -e
+  if [[ $APT_STATUS -ne 0 ]]; then
+    echo "[bootstrap] Warning: CUDA apt packages could not be installed (continuing anyway)." >&2
+  fi
+fi
+
 DEFAULT_GPU_INDEX="https://download.pytorch.org/whl/cu124"
 DEFAULT_CPU_INDEX="https://download.pytorch.org/whl/cpu"
 
@@ -26,10 +57,23 @@ fi
 
 INDEX_STRATEGY="${UV_INDEX_STRATEGY:-unsafe-best-match}"
 
+FIND_LINKS_VALUE=""
+if [[ -d "$STUB_WHEEL_DIR" ]]; then
+  FIND_LINKS_VALUE="$STUB_WHEEL_DIR"
+fi
+if [[ -n "${UV_FIND_LINKS:-}" ]]; then
+  if [[ -n "$FIND_LINKS_VALUE" ]]; then
+    FIND_LINKS_VALUE+=" ${UV_FIND_LINKS}"
+  else
+    FIND_LINKS_VALUE="$UV_FIND_LINKS"
+  fi
+fi
+
 echo "[bootstrap] Syncing project dependencies..."
 sync_with_index() {
   UV_EXTRA_INDEX_URL="$1" \
   UV_INDEX_STRATEGY="$INDEX_STRATEGY" \
+  UV_FIND_LINKS="$FIND_LINKS_VALUE" \
     uv sync --all-extras
 }
 
@@ -45,10 +89,12 @@ if ! sync_with_index "$EXTRA_INDEX"; then
 fi
 
 echo "[bootstrap] Installing vf-function-caller environment (editable)..."
-uv pip install -e environments/vf_function_caller
+UV_FIND_LINKS="$FIND_LINKS_VALUE" \
+  uv pip install -e environments/vf_function_caller
 
 echo "[bootstrap] Installing prime-rl (editable, vendored)..."
 UV_EXTRA_INDEX_URL="${UV_EXTRA_INDEX_URL:-$EXTRA_INDEX}" \
+UV_FIND_LINKS="$FIND_LINKS_VALUE" \
   uv pip install -e external/prime-rl
 
 echo "[bootstrap] Done. Activate the venv with:"

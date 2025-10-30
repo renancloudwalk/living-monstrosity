@@ -10,13 +10,37 @@ if ! command -v uv >/dev/null 2>&1; then
   source "$HOME/.local/bin/env"
 fi
 
-EXTRA_INDEX="${UV_EXTRA_INDEX_URL:-https://download.pytorch.org/whl/cu124}"
+DEFAULT_GPU_INDEX="https://download.pytorch.org/whl/cu124"
+DEFAULT_CPU_INDEX="https://download.pytorch.org/whl/cpu"
+
+if [[ -n "${UV_EXTRA_INDEX_URL:-}" ]]; then
+  EXTRA_INDEX="$UV_EXTRA_INDEX_URL"
+  FALLBACK_INDEX=""
+elif command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
+  EXTRA_INDEX="$DEFAULT_GPU_INDEX"
+  FALLBACK_INDEX="$DEFAULT_CPU_INDEX"
+else
+  EXTRA_INDEX="$DEFAULT_CPU_INDEX"
+  FALLBACK_INDEX=""
+fi
+
 INDEX_STRATEGY="${UV_INDEX_STRATEGY:-unsafe-best-match}"
 
 echo "[bootstrap] Syncing project dependencies..."
-UV_EXTRA_INDEX_URL="$EXTRA_INDEX" \
-UV_INDEX_STRATEGY="$INDEX_STRATEGY" \
-  uv sync --all-extras
+sync_with_index() {
+  UV_EXTRA_INDEX_URL="$1" \
+  UV_INDEX_STRATEGY="$INDEX_STRATEGY" \
+    uv sync --all-extras
+}
+
+if ! sync_with_index "$EXTRA_INDEX"; then
+  if [[ -n "$FALLBACK_INDEX" ]]; then
+    echo "[bootstrap] CUDA wheels unavailable, retrying with CPU index..." >&2
+    sync_with_index "$FALLBACK_INDEX"
+  else
+    exit 1
+  fi
+fi
 
 echo "[bootstrap] Installing vf-function-caller environment (editable)..."
 uv pip install -e environments/vf_function_caller

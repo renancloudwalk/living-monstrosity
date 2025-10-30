@@ -37,6 +37,7 @@ if ! sync_with_index "$EXTRA_INDEX"; then
   if [[ -n "$FALLBACK_INDEX" ]]; then
     echo "[bootstrap] CUDA wheels unavailable, retrying with CPU index..." >&2
     sync_with_index "$FALLBACK_INDEX"
+    EXTRA_INDEX="$FALLBACK_INDEX"
   else
     exit 1
   fi
@@ -44,6 +45,10 @@ fi
 
 echo "[bootstrap] Installing vf-function-caller environment (editable)..."
 uv pip install -e environments/vf_function_caller
+
+echo "[bootstrap] Installing prime-rl (editable, vendored)..."
+UV_EXTRA_INDEX_URL="${UV_EXTRA_INDEX_URL:-$EXTRA_INDEX}" \
+  uv pip install -e external/prime-rl
 
 echo "[bootstrap] Done. Activate the venv with:"
 echo "  source .venv/bin/activate"

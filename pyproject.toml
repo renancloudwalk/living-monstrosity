@@ -9,7 +9,6 @@ dependencies = [
     "datasets>=2.19.0",
     "pytest>=7.0",
     "torch>=2.2.0",
-    "prime-rl @ git+https://github.com/PrimeIntellect-ai/prime-rl.git",
 ]
 
 [build-system]

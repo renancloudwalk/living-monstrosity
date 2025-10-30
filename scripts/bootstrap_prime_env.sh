@@ -57,6 +57,7 @@ fi
 
 INDEX_STRATEGY="${UV_INDEX_STRATEGY:-unsafe-best-match}"
 
+# Collect find-links entries (local stubs + user overrides).
 FIND_LINKS_VALUE=""
 if [[ -d "$STUB_WHEEL_DIR" ]]; then
   FIND_LINKS_VALUE="$STUB_WHEEL_DIR"
@@ -67,6 +68,13 @@ if [[ -n "${UV_FIND_LINKS:-}" ]]; then
   else
     FIND_LINKS_VALUE="$UV_FIND_LINKS"
   fi
+fi
+declare -a FIND_LINKS_ARGS=()
+if [[ -n "$FIND_LINKS_VALUE" ]]; then
+  read -r -a _links <<<"$FIND_LINKS_VALUE"
+  for link in "${_links[@]}"; do
+    FIND_LINKS_ARGS+=(--find-links "$link")
+  done
 fi
 
 echo "[bootstrap] Syncing project dependencies..."
@@ -89,21 +97,23 @@ if ! sync_with_index "$EXTRA_INDEX"; then
 fi
 
 echo "[bootstrap] Installing vf-function-caller environment (editable)..."
-if [[ -n "$FIND_LINKS_VALUE" ]]; then
-  uv pip install --find-links "$FIND_LINKS_VALUE" --index-strategy "$INDEX_STRATEGY" -e environments/vf_function_caller
-else
-  uv pip install --index-strategy "$INDEX_STRATEGY" -e environments/vf_function_caller
-endif
+VF_ARGS=(uv pip install --index-strategy "$INDEX_STRATEGY")
+if [[ ${#FIND_LINKS_ARGS[@]} -gt 0 ]]; then
+  VF_ARGS+=("${FIND_LINKS_ARGS[@]}")
+fi
+VF_ARGS+=(-e environments/vf_function_caller)
+"${VF_ARGS[@]}"
 
 echo "[bootstrap] Installing prime-rl (editable, vendored)..."
-EXTRA_ARG=()
+PRIME_ARGS=(uv pip install --index-strategy "$INDEX_STRATEGY")
 if [[ -n "${UV_EXTRA_INDEX_URL:-$EXTRA_INDEX}" ]]; then
-  EXTRA_ARG+=(--extra-index-url "${UV_EXTRA_INDEX_URL:-$EXTRA_INDEX}")
+  PRIME_ARGS+=(--extra-index-url "${UV_EXTRA_INDEX_URL:-$EXTRA_INDEX}")
 fi
-if [[ -n "$FIND_LINKS_VALUE" ]]; then
-  EXTRA_ARG+=(--find-links "$FIND_LINKS_VALUE")
+if [[ ${#FIND_LINKS_ARGS[@]} -gt 0 ]]; then
+  PRIME_ARGS+=("${FIND_LINKS_ARGS[@]}")
 fi
-uv pip install --index-strategy "$INDEX_STRATEGY" "${EXTRA_ARG[@]}" -e external/prime-rl
+PRIME_ARGS+=(-e external/prime-rl)
+"${PRIME_ARGS[@]}"
 
 echo "[bootstrap] Done. Activate the venv with:"
 echo "  source .venv/bin/activate"

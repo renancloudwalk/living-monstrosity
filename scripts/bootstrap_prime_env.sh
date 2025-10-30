@@ -36,6 +36,7 @@ sync_with_index() {
 if ! sync_with_index "$EXTRA_INDEX"; then
   if [[ -n "$FALLBACK_INDEX" ]]; then
     echo "[bootstrap] CUDA wheels unavailable, retrying with CPU index..." >&2
+    rm -f uv.lock
     sync_with_index "$FALLBACK_INDEX"
     EXTRA_INDEX="$FALLBACK_INDEX"
   else

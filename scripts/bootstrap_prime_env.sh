@@ -89,13 +89,21 @@ if ! sync_with_index "$EXTRA_INDEX"; then
 fi
 
 echo "[bootstrap] Installing vf-function-caller environment (editable)..."
-UV_FIND_LINKS="$FIND_LINKS_VALUE" \
-  uv pip install -e environments/vf_function_caller
+if [[ -n "$FIND_LINKS_VALUE" ]]; then
+  uv pip install --find-links "$FIND_LINKS_VALUE" --index-strategy "$INDEX_STRATEGY" -e environments/vf_function_caller
+else
+  uv pip install --index-strategy "$INDEX_STRATEGY" -e environments/vf_function_caller
+endif
 
 echo "[bootstrap] Installing prime-rl (editable, vendored)..."
-UV_EXTRA_INDEX_URL="${UV_EXTRA_INDEX_URL:-$EXTRA_INDEX}" \
-UV_FIND_LINKS="$FIND_LINKS_VALUE" \
-  uv pip install -e external/prime-rl
+EXTRA_ARG=()
+if [[ -n "${UV_EXTRA_INDEX_URL:-$EXTRA_INDEX}" ]]; then
+  EXTRA_ARG+=(--extra-index-url "${UV_EXTRA_INDEX_URL:-$EXTRA_INDEX}")
+fi
+if [[ -n "$FIND_LINKS_VALUE" ]]; then
+  EXTRA_ARG+=(--find-links "$FIND_LINKS_VALUE")
+fi
+uv pip install --index-strategy "$INDEX_STRATEGY" "${EXTRA_ARG[@]}" -e external/prime-rl
 
 echo "[bootstrap] Done. Activate the venv with:"
 echo "  source .venv/bin/activate"

@@ -4,45 +4,54 @@ set -euo pipefail
 # Fix script to locate nvidia-cudnn-cu12 libraries and set LD_LIBRARY_PATH
 # Run this if you get "libcudnn.so.9: cannot open shared object file" error
 
-echo "[fix] Searching for nvidia-cudnn-cu12 package libraries..." >&2
+echo "[fix] Searching for cudnn libraries in site-packages..." >&2
 
 CUDNN_LIB_DIR=$(uv run python -c "
-import importlib.metadata as md
 from pathlib import Path
 import sys
+import site
 
-try:
-    dist = md.distribution('nvidia-cudnn-cu12')
-    files = dist.files or []
+# Get all site-packages directories
+site_packages = site.getsitepackages()
+if hasattr(site, 'getusersitepackages'):
+    site_packages.append(site.getusersitepackages())
 
-    if not files:
-        print('[fix] ERROR: nvidia-cudnn-cu12 has no files', file=sys.stderr)
-        sys.exit(1)
+for sp_dir in site_packages:
+    sp_path = Path(sp_dir)
+    if not sp_path.exists():
+        continue
 
-    for file in files:
-        # Check if .so is anywhere in the filename
-        if '.so' in str(file):
-            lib_path = Path(dist.locate_file(file)).parent.resolve()
-            print(lib_path)
+    # Check nvidia/cudnn/lib directory
+    cudnn_lib = sp_path / 'nvidia' / 'cudnn' / 'lib'
+    if cudnn_lib.exists() and any(cudnn_lib.glob('libcudnn.so*')):
+        print(cudnn_lib.resolve())
+        sys.exit(0)
+
+    # Search for libcudnn.so* files anywhere
+    for match in sp_path.glob('**/libcudnn.so*'):
+        if match.is_file():
+            print(match.parent.resolve())
             sys.exit(0)
 
-    print('[fix] ERROR: No .so files found in nvidia-cudnn-cu12 package', file=sys.stderr)
-    sys.exit(1)
-except md.PackageNotFoundError:
-    print('[fix] ERROR: nvidia-cudnn-cu12 not installed', file=sys.stderr)
-    sys.exit(1)
+print('[fix] ERROR: libcudnn.so not found in site-packages', file=sys.stderr)
+sys.exit(1)
 " 2>&1) || {
-    echo "[fix] Failed to locate nvidia-cudnn-cu12. Installing it now..." >&2
-    uv pip install --upgrade nvidia-cudnn-cu12
-    CUDNN_LIB_DIR=$(uv run python -c "
-import importlib.metadata as md
+    echo "[fix] cudnn libraries not found. Trying to install nvidia-cudnn-cu12..." >&2
+    if uv pip install --upgrade nvidia-cudnn-cu12; then
+        CUDNN_LIB_DIR=$(uv run python -c "
 from pathlib import Path
-dist = md.distribution('nvidia-cudnn-cu12')
-for file in dist.files or []:
-    if '.so' in str(file):
-        print(Path(dist.locate_file(file)).parent.resolve())
+import site
+for sp_dir in site.getsitepackages():
+    sp_path = Path(sp_dir)
+    cudnn_lib = sp_path / 'nvidia' / 'cudnn' / 'lib'
+    if cudnn_lib.exists():
+        print(cudnn_lib.resolve())
         break
 ")
+    else
+        echo "[fix] ERROR: Failed to install nvidia-cudnn-cu12" >&2
+        exit 1
+    fi
 }
 
 if [[ -z "$CUDNN_LIB_DIR" ]]; then

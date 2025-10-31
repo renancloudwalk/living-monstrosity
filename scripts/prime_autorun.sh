@@ -48,11 +48,18 @@ mkdir -p "$OUTPUT_DIR"
 
 find_cuda_lib_dirs() {
   uv run python - <<'PY'
-import importlib.metadata as md
 from pathlib import Path
 import sys
+import site
 
-PREFIXES = (
+lib_dirs = set()
+
+# Get all site-packages directories
+site_packages = site.getsitepackages()
+if hasattr(site, 'getusersitepackages'):
+    site_packages.append(site.getusersitepackages())
+
+cuda_prefixes = (
     "libcudnn",
     "libcublas",
     "libcublasLt",
@@ -64,51 +71,37 @@ PREFIXES = (
     "libcufft",
 )
 
-# Priority packages to check explicitly (most critical for inference)
-PRIORITY_PACKAGES = [
-    "nvidia-cudnn-cu12",
-    "nvidia-cublas-cu12",
-    "nvidia-cuda-runtime-cu12",
-]
-
-dirs: set[str] = set()
-
-# First, explicitly check priority packages for .so files
-for pkg_name in PRIORITY_PACKAGES:
-    try:
-        dist = md.distribution(pkg_name)
-        files = dist.files or ()
-        for file in files:
-            file_str = str(file)
-            # Check if filename contains .so (handles .so, .so.9, .so.X.Y, etc)
-            if ".so" in file_str:
-                full_path = Path(dist.locate_file(file))
-                lib_dir = full_path.parent.resolve()
-                dirs.add(str(lib_dir))
-                # Only need to find one .so file per package
-                break
-    except Exception as e:
-        print(f"Warning: failed to check {pkg_name}: {e}", file=sys.stderr)
+for sp_dir in site_packages:
+    sp_path = Path(sp_dir)
+    if not sp_path.exists():
         continue
 
-# Then scan all distributions for CUDA libraries
-for dist in md.distributions():
-    try:
-        files = dist.files or ()
-    except Exception:
-        continue
-    for file in files:
-        name = file.name
-        if any(name.startswith(prefix) for prefix in PREFIXES):
-            resolved = Path(dist.locate_file(file)).parent.resolve()
-            dirs.add(str(resolved))
-            break
+    # Search nvidia/*/lib directories (e.g., nvidia/cudnn/lib, nvidia/cublas/lib)
+    for lib_dir in sp_path.glob("nvidia/*/lib"):
+        if lib_dir.is_dir() and any(lib_dir.glob("*.so*")):
+            lib_dirs.add(str(lib_dir.resolve()))
 
+    # Search torch/lib directory
+    torch_lib = sp_path / "torch" / "lib"
+    if torch_lib.exists() and any(torch_lib.glob("*.so*")):
+        lib_dirs.add(str(torch_lib.resolve()))
+
+    # Search torchvision.libs
+    torch_vision_libs = sp_path / "torchvision.libs"
+    if torch_vision_libs.exists() and any(torch_vision_libs.glob("*.so*")):
+        lib_dirs.add(str(torch_vision_libs.resolve()))
+
+    # Direct search for CUDA .so files
+    for prefix in cuda_prefixes:
+        for match in sp_path.glob(f"**/{prefix}.so*"):
+            lib_dirs.add(str(match.parent.resolve()))
+
+# Check vendor stubs
 vendor_stubs = Path("vendor/cuda_stubs")
 if vendor_stubs.exists():
-    dirs.add(str(vendor_stubs.resolve()))
+    lib_dirs.add(str(vendor_stubs.resolve()))
 
-for path in sorted(dirs):
+for path in sorted(lib_dirs):
     print(path)
 PY
 }

@@ -127,17 +127,45 @@ wire_cuda_libs() {
   export LIBRARY_PATH
 }
 
+verify_torch_loads() {
+  uv run python -c "import torch; print(f'torch {torch.__version__}')" 2>&1
+}
+
 echo "[autorun] wiring CUDA libraries into library path" >&2
 NVIDIA_LIB_DIRS="$(find_cuda_lib_dirs)"
 
 if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
-  echo "[autorun] Found CUDA library directories:" >&2
+  echo "[autorun] Candidate CUDA library directories:" >&2
   echo "$NVIDIA_LIB_DIRS" | while IFS= read -r dir; do
     echo "  - $dir" >&2
   done
+
+  # Check if libcudnn.so.9 actually exists in any of the directories
+  FOUND_CUDNN=0
+  while IFS= read -r dir; do
+    if [[ -f "$dir/libcudnn.so.9" ]] || ls "$dir"/libcudnn.so.* >/dev/null 2>&1; then
+      FOUND_CUDNN=1
+      break
+    fi
+  done <<<"$NVIDIA_LIB_DIRS"
+
+  if [[ $FOUND_CUDNN -eq 0 ]]; then
+    echo "[autorun] ✗ None of the directories contain libcudnn.so.9" >&2
+    NVIDIA_LIB_DIRS=""
+  else
+    # Wire up the paths and verify torch loads
+    wire_cuda_libs "$NVIDIA_LIB_DIRS"
+    echo "[autorun] Testing if torch can load with these paths..." >&2
+    if ! verify_torch_loads >/dev/null 2>&1; then
+      echo "[autorun] ✗ Torch still cannot load CUDA libraries" >&2
+      NVIDIA_LIB_DIRS=""
+    else
+      echo "[autorun] ✓ Torch loads successfully" >&2
+    fi
+  fi
 fi
 
-# If no libs found, try multiple recovery strategies
+# If no libs found or verification failed, try multiple recovery strategies
 if [[ -z "$NVIDIA_LIB_DIRS" ]]; then
   echo "[autorun] No CUDA libraries found in Python environment" >&2
 
@@ -146,7 +174,25 @@ if [[ -z "$NVIDIA_LIB_DIRS" ]]; then
   if uv pip install --force-reinstall --no-deps nvidia-cudnn-cu12 nvidia-cublas-cu12 >&2 2>/dev/null; then
     NVIDIA_LIB_DIRS="$(find_cuda_lib_dirs)"
     if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
-      echo "[autorun] ✓ Found libraries after reinstall" >&2
+      # Check for libcudnn.so.9
+      FOUND_CUDNN=0
+      while IFS= read -r dir; do
+        if [[ -f "$dir/libcudnn.so.9" ]] || ls "$dir"/libcudnn.so.* >/dev/null 2>&1; then
+          FOUND_CUDNN=1
+          break
+        fi
+      done <<<"$NVIDIA_LIB_DIRS"
+
+      if [[ $FOUND_CUDNN -eq 1 ]]; then
+        wire_cuda_libs "$NVIDIA_LIB_DIRS"
+        if verify_torch_loads >/dev/null 2>&1; then
+          echo "[autorun] ✓ Found and verified libraries after reinstall" >&2
+        else
+          NVIDIA_LIB_DIRS=""
+        fi
+      else
+        NVIDIA_LIB_DIRS=""
+      fi
     fi
   fi
 
@@ -165,7 +211,12 @@ if [[ -z "$NVIDIA_LIB_DIRS" ]]; then
       if [[ -f /tmp/cuda_libs.txt ]]; then
         NVIDIA_LIB_DIRS=$(cat /tmp/cuda_libs.txt)
         rm /tmp/cuda_libs.txt
-        echo "[autorun] ✓ Found system CUDA libraries" >&2
+        wire_cuda_libs "$NVIDIA_LIB_DIRS"
+        if verify_torch_loads >/dev/null 2>&1; then
+          echo "[autorun] ✓ Found and verified system CUDA libraries" >&2
+        else
+          NVIDIA_LIB_DIRS=""
+        fi
       fi
     fi
   fi
@@ -176,24 +227,33 @@ if [[ -z "$NVIDIA_LIB_DIRS" ]]; then
     if uv pip install --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu121 'torch>=2.2.0' >&2 2>/dev/null; then
       NVIDIA_LIB_DIRS="$(find_cuda_lib_dirs)"
       if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
-        echo "[autorun] ✓ Found libraries in torch package" >&2
+        # Check for libcudnn.so.9
+        FOUND_CUDNN=0
+        while IFS= read -r dir; do
+          if [[ -f "$dir/libcudnn.so.9" ]] || ls "$dir"/libcudnn.so.* >/dev/null 2>&1; then
+            FOUND_CUDNN=1
+            break
+          fi
+        done <<<"$NVIDIA_LIB_DIRS"
+
+        if [[ $FOUND_CUDNN -eq 1 ]]; then
+          wire_cuda_libs "$NVIDIA_LIB_DIRS"
+          if verify_torch_loads >/dev/null 2>&1; then
+            echo "[autorun] ✓ Found and verified libraries in torch package" >&2
+          else
+            NVIDIA_LIB_DIRS=""
+          fi
+        else
+          NVIDIA_LIB_DIRS=""
+        fi
       fi
     fi
   fi
 fi
 
 if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
-  wire_cuda_libs "$NVIDIA_LIB_DIRS"
   echo "[autorun] ✓ LD_LIBRARY_PATH configured: $LD_LIBRARY_PATH" >&2
-
-  # Verify torch can actually load
-  echo "[autorun] Verifying torch can load CUDA libraries..." >&2
-  if uv run python -c "import torch; print(f'torch {torch.__version__} OK')" >&2 2>&1; then
-    echo "[autorun] ✓ Torch CUDA verification passed" >&2
-  else
-    echo "[autorun] ✗ WARNING: Torch still cannot load CUDA libraries" >&2
-    echo "[autorun] This may cause vLLM to fail. Check logs for details." >&2
-  fi
+  echo "[autorun] ✓ Torch CUDA verification passed" >&2
 else
   echo "[autorun] ✗ FATAL: Could not find or install CUDA libraries" >&2
   echo "[autorun] Attempted:" >&2

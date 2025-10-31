@@ -63,7 +63,36 @@ PREFIXES = (
     "libcufft",
 )
 
+# Priority packages to check explicitly (most critical for inference)
+PRIORITY_PACKAGES = [
+    "nvidia-cudnn-cu12",
+    "nvidia-cublas-cu12",
+    "nvidia-cuda-runtime-cu12",
+]
+
 dirs: set[str] = set()
+
+# First, explicitly check priority packages
+for pkg_name in PRIORITY_PACKAGES:
+    try:
+        dist = md.distribution(pkg_name)
+        files = dist.files or ()
+        for file in files:
+            # Check if it's a .so file in lib directory
+            if file.suffix in (".so", "") and "lib" in str(file):
+                parent = Path(dist.locate_file(file)).parent.resolve()
+                # Look for the actual lib directory (nvidia/*/lib or similar)
+                if parent.name == "lib" or any(p.name == "lib" for p in parent.parents):
+                    dirs.add(str(parent))
+                    break
+                # Also check if parent contains .so files
+                elif any(str(file).endswith(".so") for file in [file]):
+                    dirs.add(str(parent))
+                    break
+    except Exception:
+        continue
+
+# Then scan all distributions for CUDA libraries
 for dist in md.distributions():
     try:
         files = dist.files or ()
@@ -108,6 +137,13 @@ wire_cuda_libs() {
 
 echo "[autorun] wiring CUDA libraries into library path (best effort)" >&2
 NVIDIA_LIB_DIRS="$(find_cuda_lib_dirs)"
+
+if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
+  echo "[autorun] Found CUDA library directories:" >&2
+  echo "$NVIDIA_LIB_DIRS" | while IFS= read -r dir; do
+    echo "  - $dir" >&2
+  done
+fi
 
 if [[ -z "$NVIDIA_LIB_DIRS" ]]; then
   echo "[autorun] no CUDA libs detected; attempting pip fallback for NVIDIA wheels..." >&2

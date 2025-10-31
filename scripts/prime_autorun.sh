@@ -46,16 +46,72 @@ echo "[autorun] bootstrapping environment" >&2
 
 mkdir -p "$OUTPUT_DIR"
 
+echo "[autorun] wiring NVIDIA Python wheels into library path (best effort)" >&2
+NVIDIA_LIB_DIRS="$(
+  uv run python - <<'PY' 2>/dev/null || true
+import importlib
+import pkgutil
+from pathlib import Path
+
+try:
+    import nvidia  # type: ignore
+except Exception:
+    raise SystemExit
+
+seen = set()
+for module in pkgutil.iter_modules(nvidia.__path__):
+    try:
+        pkg = importlib.import_module(f"nvidia.{module.name}")
+    except Exception:
+        continue
+    for candidate in ("lib", "lib64"):
+        lib_dir = Path(pkg.__path__[0]) / candidate
+        if lib_dir.is_dir():
+            seen.add(str(lib_dir))
+
+for path in sorted(seen):
+    print(path)
+PY
+)"
+
+if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
+  while IFS= read -r lib_dir; do
+    if [[ -d "$lib_dir" ]]; then
+      if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
+        LD_LIBRARY_PATH="${lib_dir}:${LD_LIBRARY_PATH}"
+      else
+        LD_LIBRARY_PATH="${lib_dir}"
+      fi
+      if [[ -n "${LIBRARY_PATH:-}" ]]; then
+        LIBRARY_PATH="${lib_dir}:${LIBRARY_PATH}"
+      else
+        LIBRARY_PATH="${lib_dir}"
+      fi
+    fi
+  done <<<"$NVIDIA_LIB_DIRS"
+  export LD_LIBRARY_PATH
+  export LIBRARY_PATH
+  echo "[autorun] LD_LIBRARY_PATH updated: $LD_LIBRARY_PATH" >&2
+else
+  echo "[autorun] no NVIDIA Python wheels detected; continuing" >&2
+fi
+
 INFER_LOG="$OUTPUT_DIR/inference.log"
 if pgrep -f "uv run inference" >/dev/null 2>&1; then
   echo "[autorun] vLLM inference already running" >&2
 else
-  echo "[autorun] starting vLLM inference (logs -> $INFER_LOG)" >&2
+  echo "[autorun] starting vLLM inference (mirroring logs -> $INFER_LOG)" >&2
   VLLM_USE_V1=0 \
     nohup uv run inference @ configs/debug/rl/inference.toml \
       --server.port "$PORT" \
-      > "$INFER_LOG" 2>&1 &
+      > >(tee "$INFER_LOG") 2>&1 &
   SERVER_PID=$!
+  sleep 3
+  if ! kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+    echo "[autorun] inference process exited immediately; see logs above for details" >&2
+    wait "$SERVER_PID" || true
+    exit 1
+  fi
   echo "[autorun] inference pid: $SERVER_PID" >&2
   echo "[autorun] waiting for inference server to accept connections" >&2
   for attempt in {1..30}; do
@@ -64,6 +120,11 @@ else
       break
     fi
     sleep 2
+    if ! kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+      echo "[autorun] inference server died before becoming ready; see logs above" >&2
+      wait "$SERVER_PID" || true
+      exit 1
+    fi
     if [[ $attempt -eq 30 ]]; then
       echo "[autorun] failed to reach inference server" >&2
       exit 1

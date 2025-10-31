@@ -47,9 +47,10 @@ echo "[autorun] bootstrapping environment" >&2
 mkdir -p "$OUTPUT_DIR"
 
 find_cuda_lib_dirs() {
-  uv run python - <<'PY' 2>/dev/null || true
+  uv run python - <<'PY'
 import importlib.metadata as md
 from pathlib import Path
+import sys
 
 PREFIXES = (
     "libcudnn",
@@ -72,24 +73,22 @@ PRIORITY_PACKAGES = [
 
 dirs: set[str] = set()
 
-# First, explicitly check priority packages
+# First, explicitly check priority packages for .so files
 for pkg_name in PRIORITY_PACKAGES:
     try:
         dist = md.distribution(pkg_name)
         files = dist.files or ()
         for file in files:
-            # Check if it's a .so file in lib directory
-            if file.suffix in (".so", "") and "lib" in str(file):
-                parent = Path(dist.locate_file(file)).parent.resolve()
-                # Look for the actual lib directory (nvidia/*/lib or similar)
-                if parent.name == "lib" or any(p.name == "lib" for p in parent.parents):
-                    dirs.add(str(parent))
-                    break
-                # Also check if parent contains .so files
-                elif any(str(file).endswith(".so") for file in [file]):
-                    dirs.add(str(parent))
-                    break
-    except Exception:
+            file_str = str(file)
+            # Check if filename contains .so (handles .so, .so.9, .so.X.Y, etc)
+            if ".so" in file_str:
+                full_path = Path(dist.locate_file(file))
+                lib_dir = full_path.parent.resolve()
+                dirs.add(str(lib_dir))
+                # Only need to find one .so file per package
+                break
+    except Exception as e:
+        print(f"Warning: failed to check {pkg_name}: {e}", file=sys.stderr)
         continue
 
 # Then scan all distributions for CUDA libraries

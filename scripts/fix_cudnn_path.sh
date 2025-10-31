@@ -13,17 +13,20 @@ import sys
 
 try:
     dist = md.distribution('nvidia-cudnn-cu12')
-    if not dist.files:
+    files = dist.files or []
+
+    if not files:
         print('[fix] ERROR: nvidia-cudnn-cu12 has no files', file=sys.stderr)
         sys.exit(1)
 
-    for file in dist.files:
-        if file.name.startswith('libcudnn.so'):
+    for file in files:
+        # Check if .so is anywhere in the filename
+        if '.so' in str(file):
             lib_path = Path(dist.locate_file(file)).parent.resolve()
             print(lib_path)
             sys.exit(0)
 
-    print('[fix] ERROR: libcudnn.so not found in nvidia-cudnn-cu12 package', file=sys.stderr)
+    print('[fix] ERROR: No .so files found in nvidia-cudnn-cu12 package', file=sys.stderr)
     sys.exit(1)
 except md.PackageNotFoundError:
     print('[fix] ERROR: nvidia-cudnn-cu12 not installed', file=sys.stderr)
@@ -35,8 +38,8 @@ except md.PackageNotFoundError:
 import importlib.metadata as md
 from pathlib import Path
 dist = md.distribution('nvidia-cudnn-cu12')
-for file in dist.files:
-    if file.name.startswith('libcudnn.so'):
+for file in dist.files or []:
+    if '.so' in str(file):
         print(Path(dist.locate_file(file)).parent.resolve())
         break
 ")

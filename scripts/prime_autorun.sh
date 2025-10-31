@@ -127,7 +127,7 @@ wire_cuda_libs() {
   export LIBRARY_PATH
 }
 
-echo "[autorun] wiring CUDA libraries into library path (best effort)" >&2
+echo "[autorun] wiring CUDA libraries into library path" >&2
 NVIDIA_LIB_DIRS="$(find_cuda_lib_dirs)"
 
 if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
@@ -137,21 +137,71 @@ if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
   done
 fi
 
+# If no libs found, try multiple recovery strategies
 if [[ -z "$NVIDIA_LIB_DIRS" ]]; then
-  echo "[autorun] no CUDA libs detected; attempting pip fallback for NVIDIA wheels..." >&2
-  if uv pip install --upgrade nvidia-cudnn-cu12 >&2; then
+  echo "[autorun] No CUDA libraries found in Python environment" >&2
+
+  # Strategy 1: Try reinstalling nvidia packages
+  echo "[autorun] Strategy 1: Reinstalling nvidia-cudnn-cu12..." >&2
+  if uv pip install --force-reinstall --no-deps nvidia-cudnn-cu12 nvidia-cublas-cu12 >&2 2>/dev/null; then
     NVIDIA_LIB_DIRS="$(find_cuda_lib_dirs)"
-  else
-    echo "[autorun] pip fallback for NVIDIA wheels failed" >&2
+    if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
+      echo "[autorun] ✓ Found libraries after reinstall" >&2
+    fi
+  fi
+
+  # Strategy 2: Install system CUDA libraries if we have root
+  if [[ -z "$NVIDIA_LIB_DIRS" ]] && [[ "$(id -u)" -eq 0 ]] && command -v apt-get >/dev/null 2>&1; then
+    echo "[autorun] Strategy 2: Installing system CUDA libraries via apt..." >&2
+    export DEBIAN_FRONTEND=noninteractive
+    if apt-get update >&2 2>/dev/null && \
+       apt-get install -y --no-install-recommends libcudnn9 libcudnn9-cuda-12 >&2 2>/dev/null; then
+      # Add system lib paths
+      for sys_lib in /usr/lib/x86_64-linux-gnu /usr/local/cuda/lib64 /usr/local/cuda-12/lib64; do
+        if [[ -d "$sys_lib" ]] && ls "$sys_lib"/libcudnn.so* >/dev/null 2>&1; then
+          echo "$sys_lib" >> /tmp/cuda_libs.txt
+        fi
+      done
+      if [[ -f /tmp/cuda_libs.txt ]]; then
+        NVIDIA_LIB_DIRS=$(cat /tmp/cuda_libs.txt)
+        rm /tmp/cuda_libs.txt
+        echo "[autorun] ✓ Found system CUDA libraries" >&2
+      fi
+    fi
+  fi
+
+  # Strategy 3: Try installing torch with CUDA bundles
+  if [[ -z "$NVIDIA_LIB_DIRS" ]]; then
+    echo "[autorun] Strategy 3: Installing torch with bundled CUDA..." >&2
+    if uv pip install --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu121 'torch>=2.2.0' >&2 2>/dev/null; then
+      NVIDIA_LIB_DIRS="$(find_cuda_lib_dirs)"
+      if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
+        echo "[autorun] ✓ Found libraries in torch package" >&2
+      fi
+    fi
   fi
 fi
 
 if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
   wire_cuda_libs "$NVIDIA_LIB_DIRS"
-  echo "[autorun] LD_LIBRARY_PATH updated: $LD_LIBRARY_PATH" >&2
+  echo "[autorun] ✓ LD_LIBRARY_PATH configured: $LD_LIBRARY_PATH" >&2
+
+  # Verify torch can actually load
+  echo "[autorun] Verifying torch can load CUDA libraries..." >&2
+  if uv run python -c "import torch; print(f'torch {torch.__version__} OK')" >&2 2>&1; then
+    echo "[autorun] ✓ Torch CUDA verification passed" >&2
+  else
+    echo "[autorun] ✗ WARNING: Torch still cannot load CUDA libraries" >&2
+    echo "[autorun] This may cause vLLM to fail. Check logs for details." >&2
+  fi
 else
-  echo "[autorun] unable to locate CUDA shared libraries (e.g. libcudnn.so.9)" >&2
-  echo "[autorun] install system CUDA libraries or ensure NVIDIA wheels are available, then re-run." >&2
+  echo "[autorun] ✗ FATAL: Could not find or install CUDA libraries" >&2
+  echo "[autorun] Attempted:" >&2
+  echo "[autorun]   1. Reinstall nvidia-cudnn-cu12 from pip" >&2
+  echo "[autorun]   2. Install system libcudnn9 via apt (requires root)" >&2
+  echo "[autorun]   3. Reinstall torch with CUDA bundles" >&2
+  echo "[autorun]" >&2
+  echo "[autorun] Manual fix: Install CUDA libraries on your system, then re-run." >&2
   exit 1
 fi
 

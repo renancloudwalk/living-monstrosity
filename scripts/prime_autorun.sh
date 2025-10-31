@@ -46,36 +46,49 @@ echo "[autorun] bootstrapping environment" >&2
 
 mkdir -p "$OUTPUT_DIR"
 
-echo "[autorun] wiring NVIDIA Python wheels into library path (best effort)" >&2
-NVIDIA_LIB_DIRS="$(
+find_cuda_lib_dirs() {
   uv run python - <<'PY' 2>/dev/null || true
-import importlib
-import pkgutil
+import importlib.metadata as md
 from pathlib import Path
 
-try:
-    import nvidia  # type: ignore
-except Exception:
-    raise SystemExit
+PREFIXES = (
+    "libcudnn",
+    "libcublas",
+    "libcublasLt",
+    "libcuda",
+    "libnvrtc",
+    "libcurand",
+    "libcusolver",
+    "libcusparse",
+    "libcufft",
+)
 
-seen = set()
-for module in pkgutil.iter_modules(nvidia.__path__):
+dirs: set[str] = set()
+for dist in md.distributions():
     try:
-        pkg = importlib.import_module(f"nvidia.{module.name}")
+        files = dist.files or ()
     except Exception:
         continue
-    for candidate in ("lib", "lib64"):
-        lib_dir = Path(pkg.__path__[0]) / candidate
-        if lib_dir.is_dir():
-            seen.add(str(lib_dir))
+    for file in files:
+        name = file.name
+        if any(name.startswith(prefix) for prefix in PREFIXES):
+            resolved = Path(dist.locate_file(file)).parent.resolve()
+            dirs.add(str(resolved))
+            break
 
-for path in sorted(seen):
+vendor_stubs = Path("vendor/cuda_stubs")
+if vendor_stubs.exists():
+    dirs.add(str(vendor_stubs.resolve()))
+
+for path in sorted(dirs):
     print(path)
 PY
-)"
+}
 
-if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
+wire_cuda_libs() {
+  local dirs="$1"
   while IFS= read -r lib_dir; do
+    [[ -z "$lib_dir" ]] && continue
     if [[ -d "$lib_dir" ]]; then
       if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
         LD_LIBRARY_PATH="${lib_dir}:${LD_LIBRARY_PATH}"
@@ -88,12 +101,30 @@ if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
         LIBRARY_PATH="${lib_dir}"
       fi
     fi
-  done <<<"$NVIDIA_LIB_DIRS"
+  done <<<"$dirs"
   export LD_LIBRARY_PATH
   export LIBRARY_PATH
+}
+
+echo "[autorun] wiring CUDA libraries into library path (best effort)" >&2
+NVIDIA_LIB_DIRS="$(find_cuda_lib_dirs)"
+
+if [[ -z "$NVIDIA_LIB_DIRS" ]]; then
+  echo "[autorun] no CUDA libs detected; attempting pip fallback for NVIDIA wheels..." >&2
+  if uv pip install --upgrade nvidia-cudnn-cu12 >&2; then
+    NVIDIA_LIB_DIRS="$(find_cuda_lib_dirs)"
+  else
+    echo "[autorun] pip fallback for NVIDIA wheels failed" >&2
+  fi
+fi
+
+if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
+  wire_cuda_libs "$NVIDIA_LIB_DIRS"
   echo "[autorun] LD_LIBRARY_PATH updated: $LD_LIBRARY_PATH" >&2
 else
-  echo "[autorun] no NVIDIA Python wheels detected; continuing" >&2
+  echo "[autorun] unable to locate CUDA shared libraries (e.g. libcudnn.so.9)" >&2
+  echo "[autorun] install system CUDA libraries or ensure NVIDIA wheels are available, then re-run." >&2
+  exit 1
 fi
 
 INFER_LOG="$OUTPUT_DIR/inference.log"

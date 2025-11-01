@@ -33,7 +33,9 @@ betas1 = 0.9
 betas2 = 0.95
 
 [logging]
-wandb_enabled = false
+wandb_enabled = true
+wandb_project = "vf-function-caller"
+wandb_run_name = "debug-local"
 log_interval = 1
 eval_interval = 25
 save_interval = 25

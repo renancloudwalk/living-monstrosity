@@ -6,7 +6,15 @@
 curl -fsSL https://raw.githubusercontent.com/renancloudwalk/living-monstrosity/main/scripts/prime_autorun.sh | bash
 ```
 
-That one liner clones the repo on your Prime pod, installs dependencies, launches vLLM, generates rollouts, runs the GRPO trainer, and leaves inference running. Override repo/branch/port/output via `LM_REPO`, `LM_BRANCH`, `LM_PORT`, or `LM_OUTPUT` if you need custom settings.
+That one liner clones the repo on your Prime pod, installs dependencies, launches vLLM, generates rollouts, runs the GRPO trainer, and leaves inference running.
+
+**Optional: Track with Weights & Biases**
+```bash
+export WANDB_API_KEY="your-key-here"  # Get from https://wandb.ai/authorize
+curl -fsSL https://raw.githubusercontent.com/renancloudwalk/living-monstrosity/main/scripts/prime_autorun.sh | bash
+```
+
+Override repo/branch/port/output via `LM_REPO`, `LM_BRANCH`, `LM_PORT`, or `LM_OUTPUT` if you need custom settings.
 
 ## Why this exists
 I want a reliable way to teach open-source LLMs (likely Qwen-based) to call real tools—starting with `curl`—and eventually scale that training from a single workstation to massive Prime Intellect clusters. The long-term goal is industrial-strength reinforcement learning for tool-using agents; this repo is the scratchpad, docs, and scripts to make that happen.

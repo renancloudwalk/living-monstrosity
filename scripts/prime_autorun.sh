@@ -5,11 +5,12 @@ set -euo pipefail
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/renancloudwalk/living-monstrosity/main/scripts/prime_autorun.sh | bash
 # Optional env vars (export before running or prefix the curl command):
-#   LM_REPO   – Git repo URL (default: https://github.com/renancloudwalk/living-monstrosity.git)
-#   LM_BRANCH – Git branch/tag to check out (default: main)
-#   LM_ROOT   – Working directory for the repo (default: $HOME/living-monstrosity)
-#   LM_PORT   – Port for the inference server (default: 8000)
-#   LM_OUTPUT – Output directory for rollouts/checkpoints (default: outputs/manual-run)
+#   LM_REPO        – Git repo URL (default: https://github.com/renancloudwalk/living-monstrosity.git)
+#   LM_BRANCH      – Git branch/tag to check out (default: main)
+#   LM_ROOT        – Working directory for the repo (default: $HOME/living-monstrosity)
+#   LM_PORT        – Port for the inference server (default: 8000)
+#   LM_OUTPUT      – Output directory for rollouts/checkpoints (default: outputs/manual-run)
+#   WANDB_API_KEY  – Weights & Biases API key for tracking (optional, get from https://wandb.ai/authorize)
 
 REPO="${LM_REPO:-https://github.com/renancloudwalk/living-monstrosity.git}"
 BRANCH="${LM_BRANCH:-main}"
@@ -45,6 +46,23 @@ echo "[autorun] bootstrapping environment" >&2
 ./scripts/bootstrap_prime_env.sh
 
 mkdir -p "$OUTPUT_DIR"
+
+# Set up Weights & Biases if API key is provided
+if [[ -n "${WANDB_API_KEY:-}" ]]; then
+  echo "[autorun] Setting up Weights & Biases..." >&2
+  if uv run wandb login "$WANDB_API_KEY" >&2 2>&1; then
+    echo "[autorun] ✓ W&B login successful" >&2
+    WANDB_ENABLED=true
+  else
+    echo "[autorun] ✗ W&B login failed, continuing without wandb" >&2
+    WANDB_ENABLED=false
+  fi
+else
+  echo "[autorun] No WANDB_API_KEY set, skipping W&B setup" >&2
+  echo "[autorun] To enable: export WANDB_API_KEY=your-key before running" >&2
+  echo "[autorun] Get your key at: https://wandb.ai/authorize" >&2
+  WANDB_ENABLED=false
+fi
 
 find_cuda_lib_dirs() {
   uv run python - <<'PY'
@@ -333,8 +351,18 @@ uv run orchestrator @ configs/debug/rl/orchestrator.toml \
   --client.base-url "http://127.0.0.1:$PORT/v1"
 
 echo "[autorun] training on collected rollouts" >&2
-uv run trainer @ configs/debug/rl/train.toml \
-  --run.output-dir "$OUTPUT_DIR"
+if [[ "$WANDB_ENABLED" == "true" ]]; then
+  echo "[autorun] Training with W&B enabled" >&2
+  uv run trainer @ configs/debug/rl/train.toml \
+    --run.output-dir "$OUTPUT_DIR" \
+    --logging.wandb-enabled true \
+    --logging.wandb-project "vf-function-caller" \
+    --logging.wandb-run-name "autorun-$(date +%Y%m%d-%H%M%S)"
+else
+  echo "[autorun] Training without W&B" >&2
+  uv run trainer @ configs/debug/rl/train.toml \
+    --run.output-dir "$OUTPUT_DIR"
+fi
 
 echo "[autorun] pipeline complete" >&2
 echo "[autorun] inference server still running on port $PORT (logs in $INFER_LOG)" >&2

@@ -45,6 +45,20 @@ Living Monstrosity is a reinforcement learning playground for training open-sour
 
 ## Development Commands
 
+### Weights & Biases Setup
+
+Get your API key from https://wandb.ai/authorize, then:
+
+```bash
+# One-time login (stores key permanently)
+uv run wandb login
+
+# Or set environment variable
+export WANDB_API_KEY="your-key-here"
+```
+
+W&B is now enabled by default in all configs. Metrics, loss curves, and sample dialogues will automatically sync to your dashboard.
+
 ### Local Development
 ```bash
 # Install dependencies (uses uv package manager)

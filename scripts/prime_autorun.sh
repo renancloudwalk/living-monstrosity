@@ -156,12 +156,13 @@ SYSTEM_LIB_DIRS=""
 echo "[autorun] Scanning system CUDA paths..." >&2
 
 # PyTorch Docker images put CUDA libs in system Python's dist-packages
+# We need ALL nvidia libs (cudnn, cublas, cufft, etc), not just cudnn
 for py_dist in /usr/local/lib/python*/dist-packages/nvidia/*/lib /usr/lib/python*/dist-packages/nvidia/*/lib; do
   for expanded_path in $py_dist; do
     if [[ -d "$expanded_path" ]]; then
-      echo "[autorun]   Checking: $expanded_path" >&2
-      if ls "$expanded_path"/libcudnn.so* >/dev/null 2>&1; then
-        echo "[autorun]   ✓ Found libcudnn in: $expanded_path" >&2
+      # Check if directory has any .so files
+      if ls "$expanded_path"/*.so* >/dev/null 2>&1; then
+        echo "[autorun]   ✓ Found CUDA libs in: $expanded_path" >&2
         SYSTEM_LIB_DIRS="${SYSTEM_LIB_DIRS}${expanded_path}"$'\n'
       fi
     fi

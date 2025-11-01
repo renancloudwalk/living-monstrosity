@@ -132,35 +132,61 @@ verify_torch_loads() {
 }
 
 echo "[autorun] wiring CUDA libraries into library path" >&2
-NVIDIA_LIB_DIRS="$(find_cuda_lib_dirs)"
 
-if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
-  echo "[autorun] Candidate CUDA library directories:" >&2
-  echo "$NVIDIA_LIB_DIRS" | while IFS= read -r dir; do
+# First, check system CUDA paths (common in Docker images with CUDA)
+SYSTEM_LIB_DIRS=""
+for sys_lib in /usr/lib/x86_64-linux-gnu /usr/local/cuda/lib64 /usr/local/cuda-12/lib64 /opt/cuda/lib64; do
+  if [[ -d "$sys_lib" ]] && ls "$sys_lib"/libcudnn.so* >/dev/null 2>&1; then
+    SYSTEM_LIB_DIRS="${SYSTEM_LIB_DIRS}${sys_lib}"$'\n'
+  fi
+done
+
+if [[ -n "$SYSTEM_LIB_DIRS" ]]; then
+  echo "[autorun] Found system CUDA libraries:" >&2
+  echo "$SYSTEM_LIB_DIRS" | while IFS= read -r dir; do
+    [[ -z "$dir" ]] && continue
     echo "  - $dir" >&2
   done
-
-  # Check if libcudnn.so.9 actually exists in any of the directories
-  FOUND_CUDNN=0
-  while IFS= read -r dir; do
-    if [[ -f "$dir/libcudnn.so.9" ]] || ls "$dir"/libcudnn.so.* >/dev/null 2>&1; then
-      FOUND_CUDNN=1
-      break
-    fi
-  done <<<"$NVIDIA_LIB_DIRS"
-
-  if [[ $FOUND_CUDNN -eq 0 ]]; then
-    echo "[autorun] ✗ None of the directories contain libcudnn.so.9" >&2
-    NVIDIA_LIB_DIRS=""
+  wire_cuda_libs "$SYSTEM_LIB_DIRS"
+  if verify_torch_loads >/dev/null 2>&1; then
+    echo "[autorun] ✓ Torch loads successfully with system CUDA" >&2
+    NVIDIA_LIB_DIRS="$SYSTEM_LIB_DIRS"
   else
-    # Wire up the paths and verify torch loads
-    wire_cuda_libs "$NVIDIA_LIB_DIRS"
-    echo "[autorun] Testing if torch can load with these paths..." >&2
-    if ! verify_torch_loads >/dev/null 2>&1; then
-      echo "[autorun] ✗ Torch still cannot load CUDA libraries" >&2
+    echo "[autorun] ✗ System CUDA found but torch cannot load" >&2
+    NVIDIA_LIB_DIRS=""
+  fi
+else
+  echo "[autorun] No system CUDA libraries found, checking Python environment..." >&2
+  NVIDIA_LIB_DIRS="$(find_cuda_lib_dirs)"
+
+  if [[ -n "$NVIDIA_LIB_DIRS" ]]; then
+    echo "[autorun] Candidate CUDA library directories:" >&2
+    echo "$NVIDIA_LIB_DIRS" | while IFS= read -r dir; do
+      echo "  - $dir" >&2
+    done
+
+    # Check if libcudnn.so.9 actually exists in any of the directories
+    FOUND_CUDNN=0
+    while IFS= read -r dir; do
+      if [[ -f "$dir/libcudnn.so.9" ]] || ls "$dir"/libcudnn.so.* >/dev/null 2>&1; then
+        FOUND_CUDNN=1
+        break
+      fi
+    done <<<"$NVIDIA_LIB_DIRS"
+
+    if [[ $FOUND_CUDNN -eq 0 ]]; then
+      echo "[autorun] ✗ None of the directories contain libcudnn.so.9" >&2
       NVIDIA_LIB_DIRS=""
     else
-      echo "[autorun] ✓ Torch loads successfully" >&2
+      # Wire up the paths and verify torch loads
+      wire_cuda_libs "$NVIDIA_LIB_DIRS"
+      echo "[autorun] Testing if torch can load with these paths..." >&2
+      if ! verify_torch_loads >/dev/null 2>&1; then
+        echo "[autorun] ✗ Torch still cannot load CUDA libraries" >&2
+        NVIDIA_LIB_DIRS=""
+      else
+        echo "[autorun] ✓ Torch loads successfully" >&2
+      fi
     fi
   fi
 fi

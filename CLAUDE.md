@@ -182,18 +182,25 @@ If you see `ImportError: libcudnn.so.9: cannot open shared object file`:
 
 **Root cause:** NVIDIA PyPI packages (nvidia-cudnn-cu12, etc.) are often stub packages with no .so files. Actual libraries may be in `site-packages/nvidia/cudnn/lib` or require system installation.
 
-**Solutions:**
-1. Run `./scripts/fix_cudnn_path.sh` to diagnose and set LD_LIBRARY_PATH
-2. Run `uv run python scripts/find_all_cuda_libs.py` to see where libraries are located
-3. Check if libraries exist: `find .venv -name "libcudnn.so*"`
-4. If missing, install system CUDA: see `scripts/bootstrap_prime_env.sh` apt install section
-5. Manually set: `export LD_LIBRARY_PATH=/path/to/nvidia/cudnn/lib:$LD_LIBRARY_PATH`
+**The autorun script automatically handles this by:**
+1. Checking system CUDA paths first (`/usr/lib/x86_64-linux-gnu`, `/usr/local/cuda*/lib64`, `/opt/cuda/lib64`)
+2. Searching Python environment (`site-packages/nvidia/*/lib`, `torch/lib`)
+3. If not found, tries 3 recovery strategies:
+   - Reinstall nvidia-cudnn-cu12 with `--force-reinstall`
+   - Install system libcudnn9 via apt (requires root)
+   - Reinstall torch from cu121 wheel index to get bundled CUDA
+4. Verifies torch can import before proceeding
 
-The autorun script searches:
-- `site-packages/nvidia/*/lib` directories
-- `site-packages/torch/lib`
-- Direct glob search for `libcudnn.so*` files
-- Falls back to installing nvidia-cudnn-cu12 if nothing found
+**Docker Images with CUDA:**
+- Images like "PyTorch 2.7.0 + CUDA 12.6.3" should work immediately
+- System CUDA libraries in `/usr/local/cuda/lib64` are detected automatically
+- No recovery strategies needed when proper CUDA is pre-installed
+
+**Manual diagnosis:**
+- Run `./scripts/fix_cudnn_path.sh` to diagnose and set LD_LIBRARY_PATH
+- Run `uv run python scripts/find_all_cuda_libs.py` to see where libraries are
+- Check system: `ls /usr/local/cuda*/lib64/libcudnn.so*`
+- Check venv: `find .venv -name "libcudnn.so*"`
 
 ## Prime Pod Best Practices
 

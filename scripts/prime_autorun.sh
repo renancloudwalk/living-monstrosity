@@ -146,11 +146,8 @@ wire_cuda_libs() {
 }
 
 verify_torch_loads() {
-  local output
-  output=$(uv run python -c "import torch; print(f'torch {torch.__version__}')" 2>&1)
-  local status=$?
-  echo "$output"
-  return $status
+  timeout 30 uv run python -c "import torch; print(f'torch {torch.__version__}')" 2>&1
+  return $?
 }
 
 echo "[autorun] wiring CUDA libraries into library path" >&2
@@ -193,23 +190,30 @@ if [[ -n "$SYSTEM_LIB_DIRS" ]]; then
     echo "  - $dir" >&2
   done
   wire_cuda_libs "$SYSTEM_LIB_DIRS"
-  echo "[autorun] Testing torch import..." >&2
+  echo "[autorun] Testing torch import (30s timeout)..." >&2
   TORCH_OUTPUT=$(verify_torch_loads 2>&1)
-  if [[ $? -eq 0 ]]; then
-    echo "[autorun] ✓ Torch loads successfully: $TORCH_OUTPUT" >&2
+  TORCH_STATUS=$?
+
+  if [[ $TORCH_STATUS -eq 124 ]]; then
+    echo "[autorun] ✗ Torch import timed out after 30s" >&2
+    NVIDIA_LIB_DIRS=""
+  elif [[ $TORCH_STATUS -eq 0 ]]; then
+    echo "[autorun] ✓ Torch loads: $TORCH_OUTPUT" >&2
     NVIDIA_LIB_DIRS="$SYSTEM_LIB_DIRS"
   else
-    echo "[autorun] ✗ Torch import failed. Error:" >&2
-    echo "$TORCH_OUTPUT" | head -20 >&2
-    echo "" >&2
-    echo "[autorun] Searching for missing library system-wide..." >&2
-    # Extract missing lib name from error
+    echo "[autorun] ✗ Torch import failed:" >&2
+    echo "$TORCH_OUTPUT" >&2
+
     MISSING_LIB=$(echo "$TORCH_OUTPUT" | grep -oP 'lib\w+\.so[.\d]*' | head -1)
     if [[ -n "$MISSING_LIB" ]]; then
-      echo "[autorun] Looking for: $MISSING_LIB" >&2
-      find /usr -name "$MISSING_LIB" 2>/dev/null | while read -r found; do
-        echo "[autorun] Found at: $found" >&2
-      done
+      echo "[autorun] Searching for: $MISSING_LIB" >&2
+      FOUND=$(find /usr -name "$MISSING_LIB" 2>/dev/null | head -5)
+      if [[ -n "$FOUND" ]]; then
+        echo "[autorun] Found at:" >&2
+        echo "$FOUND" >&2
+      else
+        echo "[autorun] Not found on system" >&2
+      fi
     fi
     NVIDIA_LIB_DIRS=""
   fi

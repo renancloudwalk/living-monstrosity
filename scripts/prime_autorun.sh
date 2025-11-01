@@ -190,31 +190,32 @@ if [[ -n "$SYSTEM_LIB_DIRS" ]]; then
     echo "  - $dir" >&2
   done
   wire_cuda_libs "$SYSTEM_LIB_DIRS"
-  echo "[autorun] Testing torch import (30s timeout)..." >&2
-  TORCH_OUTPUT=$(verify_torch_loads 2>&1)
-  TORCH_STATUS=$?
+  echo "[autorun] Testing torch import..." >&2
 
-  if [[ $TORCH_STATUS -eq 124 ]]; then
-    echo "[autorun] ✗ Torch import timed out after 30s" >&2
-    NVIDIA_LIB_DIRS=""
-  elif [[ $TORCH_STATUS -eq 0 ]]; then
-    echo "[autorun] ✓ Torch loads: $TORCH_OUTPUT" >&2
+  # Run torch test with immediate output, capture to temp file for parsing
+  TORCH_TEST_LOG="/tmp/torch_test_$$.log"
+  if timeout 30 uv run python -c "import torch; print(f'torch {torch.__version__}')" > "$TORCH_TEST_LOG" 2>&1; then
+    TORCH_VERSION=$(cat "$TORCH_TEST_LOG")
+    echo "[autorun] ✓ Torch loads: $TORCH_VERSION" >&2
+    rm -f "$TORCH_TEST_LOG"
     NVIDIA_LIB_DIRS="$SYSTEM_LIB_DIRS"
   else
-    echo "[autorun] ✗ Torch import failed:" >&2
-    echo "$TORCH_OUTPUT" >&2
+    TORCH_STATUS=$?
+    echo "[autorun] ✗ Torch import failed (status: $TORCH_STATUS)" >&2
+    cat "$TORCH_TEST_LOG" >&2
 
-    MISSING_LIB=$(echo "$TORCH_OUTPUT" | grep -oP 'lib\w+\.so[.\d]*' | head -1)
-    if [[ -n "$MISSING_LIB" ]]; then
-      echo "[autorun] Searching for: $MISSING_LIB" >&2
-      FOUND=$(find /usr -name "$MISSING_LIB" 2>/dev/null | head -5)
-      if [[ -n "$FOUND" ]]; then
-        echo "[autorun] Found at:" >&2
-        echo "$FOUND" >&2
-      else
-        echo "[autorun] Not found on system" >&2
+    if [[ $TORCH_STATUS -eq 124 ]]; then
+      echo "[autorun] (timed out after 30s)" >&2
+    else
+      MISSING_LIB=$(grep -oP 'lib\w+\.so[.\d]*' "$TORCH_TEST_LOG" | head -1)
+      if [[ -n "$MISSING_LIB" ]]; then
+        echo "[autorun] Searching for: $MISSING_LIB" >&2
+        find /usr -name "$MISSING_LIB" 2>/dev/null | head -3 | while read f; do
+          echo "[autorun]   Found: $f" >&2
+        done
       fi
     fi
+    rm -f "$TORCH_TEST_LOG"
     NVIDIA_LIB_DIRS=""
   fi
 else

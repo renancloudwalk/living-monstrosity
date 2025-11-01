@@ -154,16 +154,28 @@ echo "[autorun] wiring CUDA libraries into library path" >&2
 # First, check system CUDA paths (common in Docker images with CUDA)
 SYSTEM_LIB_DIRS=""
 echo "[autorun] Scanning system CUDA paths..." >&2
+
+# PyTorch Docker images put CUDA libs in system Python's dist-packages
+for py_dist in /usr/local/lib/python*/dist-packages/nvidia/*/lib /usr/lib/python*/dist-packages/nvidia/*/lib; do
+  for expanded_path in $py_dist; do
+    if [[ -d "$expanded_path" ]]; then
+      echo "[autorun]   Checking: $expanded_path" >&2
+      if ls "$expanded_path"/libcudnn.so* >/dev/null 2>&1; then
+        echo "[autorun]   ✓ Found libcudnn in: $expanded_path" >&2
+        SYSTEM_LIB_DIRS="${SYSTEM_LIB_DIRS}${expanded_path}"$'\n'
+      fi
+    fi
+  done
+done
+
+# Also check standard system lib paths
 for sys_lib in /usr/lib/x86_64-linux-gnu /usr/local/cuda*/lib64 /usr/lib64 /opt/cuda/lib64; do
-  # Expand wildcards
   for expanded_path in $sys_lib; do
     if [[ -d "$expanded_path" ]]; then
       echo "[autorun]   Checking: $expanded_path" >&2
       if ls "$expanded_path"/libcudnn.so* >/dev/null 2>&1; then
         echo "[autorun]   ✓ Found libcudnn in: $expanded_path" >&2
         SYSTEM_LIB_DIRS="${SYSTEM_LIB_DIRS}${expanded_path}"$'\n'
-      else
-        echo "[autorun]   ✗ No libcudnn in: $expanded_path" >&2
       fi
     fi
   done

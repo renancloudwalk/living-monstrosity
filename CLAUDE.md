@@ -24,11 +24,13 @@ Living Monstrosity is a reinforcement learning playground for training open-sour
 - Scales from 1 GPU locally to 1000+ GPUs on Prime pods
 
 **Precision Settings:**
-- **Inference (vLLM):** fp16/float16 by default (2x faster, 2x less memory)
-- **Training (Trainer):** fp32/float32 by default (more stable gradients)
-- Override inference dtype: `DTYPE=bfloat16 make serve-qwen` or set in config
-- Override training dtype: Add `dtype = "bfloat16"` to model section in training config
-- Use bfloat16 for better stability with large models on modern GPUs (A100/H100)
+- **Both inference and training use bfloat16 (bf16) by default**
+- bf16 provides: 2x memory savings, 2x faster compute, better numerical stability than fp16
+- Prime-RL trainer defaults to bf16 mixed precision (param_dtype=bfloat16)
+- vLLM inference configs set to bf16 (was fp16, now updated)
+- **Why bf16 > fp16:** Same range as fp32 (8 exp bits vs fp16's 5), avoids overflow/underflow
+- **Hardware:** Native support on A100/H100, also works on older GPUs via emulation
+- Override: `DTYPE=float16 make serve-qwen` or change in config files
 
 ### Configuration System
 - **`configs/debug/rl/`** - Local development configs (small models, short runs)
@@ -102,7 +104,7 @@ uv run vf-eval vf-function-caller -m gpt-4.1-mini -n 5
 - `MODEL` - Model to use (default: Qwen/Qwen2.5-0.5B)
 - `OUTPUT_DIR` - Output directory for rollouts/checkpoints
 - `TP`/`DP` - Tensor/data parallelism for vLLM
-- `DTYPE` - Inference dtype (default: float16, options: bfloat16, float32)
+- `DTYPE` - Inference dtype (default: bfloat16, options: float16, float32)
 - `ORCH_MAX_STEPS` - Orchestrator training steps
 - `TRAIN_MAX_STEPS` - Trainer optimization steps
 - `TRAIN_IMPL` - Model implementation (hf, liger_kernel)

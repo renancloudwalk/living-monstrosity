@@ -23,6 +23,13 @@ Living Monstrosity is a reinforcement learning playground for training open-sour
 - Trainer consumes rollout data for policy updates
 - Scales from 1 GPU locally to 1000+ GPUs on Prime pods
 
+**Precision Settings:**
+- **Inference (vLLM):** fp16/float16 by default (2x faster, 2x less memory)
+- **Training (Trainer):** fp32/float32 by default (more stable gradients)
+- Override inference dtype: `DTYPE=bfloat16 make serve-qwen` or set in config
+- Override training dtype: Add `dtype = "bfloat16"` to model section in training config
+- Use bfloat16 for better stability with large models on modern GPUs (A100/H100)
+
 ### Configuration System
 - **`configs/debug/rl/`** - Local development configs (small models, short runs)
   - `train.toml` - GRPO trainer with Qwen2.5-0.5B, 50 steps
@@ -95,6 +102,7 @@ uv run vf-eval vf-function-caller -m gpt-4.1-mini -n 5
 - `MODEL` - Model to use (default: Qwen/Qwen2.5-0.5B)
 - `OUTPUT_DIR` - Output directory for rollouts/checkpoints
 - `TP`/`DP` - Tensor/data parallelism for vLLM
+- `DTYPE` - Inference dtype (default: float16, options: bfloat16, float32)
 - `ORCH_MAX_STEPS` - Orchestrator training steps
 - `TRAIN_MAX_STEPS` - Trainer optimization steps
 - `TRAIN_IMPL` - Model implementation (hf, liger_kernel)

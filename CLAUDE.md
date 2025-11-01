@@ -24,13 +24,14 @@ Living Monstrosity is a reinforcement learning playground for training open-sour
 - Scales from 1 GPU locally to 1000+ GPUs on Prime pods
 
 **Precision Settings:**
-- **Both inference and training use bfloat16 (bf16) by default**
-- bf16 provides: 2x memory savings, 2x faster compute, better numerical stability than fp16
-- Prime-RL trainer defaults to bf16 mixed precision (param_dtype=bfloat16)
-- vLLM inference configs set to bf16 (was fp16, now updated)
-- **Why bf16 > fp16:** Same range as fp32 (8 exp bits vs fp16's 5), avoids overflow/underflow
-- **Hardware:** Native support on A100/H100, also works on older GPUs via emulation
-- Override: `DTYPE=float16 make serve-qwen` or change in config files
+- **Default: bfloat16 (bf16) for both inference and training**
+- **To use fp16 instead:** `DTYPE=float16 make serve-qwen` or set `dtype = "float16"` in configs
+- **Trade-offs:**
+  - **bf16:** Wider range (8 exp bits), better for gradients/RL, no overflow, native on A100/H100
+  - **fp16:** More precision (10 mantissa bits vs bf16's 7), some papers show better convergence
+- Prime-RL trainer defaults to bf16 but respects model config if specified
+- Both provide: 2x memory savings, 2x faster compute vs fp32
+- **Recommendation:** Try both and measure task performance - optimal dtype is model/task dependent
 
 ### Configuration System
 - **`configs/debug/rl/`** - Local development configs (small models, short runs)

@@ -1,0 +1,20 @@
+# Debug vLLM inference config with fp16 (alternative to bfloat16).
+# Use this if fp16 shows better convergence for your specific model/task.
+
+[server]
+host = "0.0.0.0"
+port = 8000
+
+[model]
+name = "Qwen/Qwen2.5-0.5B"
+dtype = "float16"
+max_model_len = 32768
+trust_remote_code = true
+
+[parallel]
+tp = 1
+dp = 1
+
+[gpu]
+gpu_memory_utilization = 0.9
+seed = 0

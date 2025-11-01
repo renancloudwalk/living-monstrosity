@@ -153,10 +153,20 @@ echo "[autorun] wiring CUDA libraries into library path" >&2
 
 # First, check system CUDA paths (common in Docker images with CUDA)
 SYSTEM_LIB_DIRS=""
-for sys_lib in /usr/lib/x86_64-linux-gnu /usr/local/cuda/lib64 /usr/local/cuda-12/lib64 /opt/cuda/lib64; do
-  if [[ -d "$sys_lib" ]] && ls "$sys_lib"/libcudnn.so* >/dev/null 2>&1; then
-    SYSTEM_LIB_DIRS="${SYSTEM_LIB_DIRS}${sys_lib}"$'\n'
-  fi
+echo "[autorun] Scanning system CUDA paths..." >&2
+for sys_lib in /usr/lib/x86_64-linux-gnu /usr/local/cuda*/lib64 /usr/lib64 /opt/cuda/lib64; do
+  # Expand wildcards
+  for expanded_path in $sys_lib; do
+    if [[ -d "$expanded_path" ]]; then
+      echo "[autorun]   Checking: $expanded_path" >&2
+      if ls "$expanded_path"/libcudnn.so* >/dev/null 2>&1; then
+        echo "[autorun]   ✓ Found libcudnn in: $expanded_path" >&2
+        SYSTEM_LIB_DIRS="${SYSTEM_LIB_DIRS}${expanded_path}"$'\n'
+      else
+        echo "[autorun]   ✗ No libcudnn in: $expanded_path" >&2
+      fi
+    fi
+  done
 done
 
 if [[ -n "$SYSTEM_LIB_DIRS" ]]; then
